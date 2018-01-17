@@ -28,6 +28,7 @@ If you want to round robin A and AAAA responses look at the *loadbalance* plugin
 file DBFILE [ZONES... ] {
     transfer to ADDRESS...
     no_reload
+    weight WEIGHTFILE
     upstream ADDRESS...
 }
 ~~~
@@ -38,10 +39,15 @@ file DBFILE [ZONES... ] {
   When an address is specified a notify message will be send whenever the zone is reloaded.
 * `no_reload` by default CoreDNS will try to reload a zone every minute and reloads if the
   SOA's serial has changed. This option disables that behavior.
+* `weight` in case of files with multiple CNAMEs of Kubernetes and EC2 servers/services, file will try to 
+  loadbalance them according to their weights specified in weightfile. **WEIGHTFILE** contains a comma 
+  separated values of FQDN CNAMEs (don't forget their leading "."). 
+  The format is CNAME.DOMAIN.TLD.,EC2ServerWeight,KubeServerWeight
 * `upstream` defines upstream resolvers to be used resolve external names found (think CNAMEs)
   pointing to external names. This is only really useful when CoreDNS is configured as a proxy, for
   normal authoritative serving you don't need *or* want to use this. **ADDRESS** can be an IP
   address, and IP:port or a string pointing to a file that is structured as /etc/resolv.conf.
+
 
 ## Examples
 
@@ -66,4 +72,17 @@ Or use a single zone file for multiple zones:
         transfer to 10.240.1.1
     }
 }
+~~~
+
+Weighted CNAME:
+~~~ corefile
+example.org {
+    file example.org.signed {
+        weight weightfile.db
+    }
+}
+~~~
+~~~ 
+weightfile.db:
+example-api.airyrooms.com,30,70
 ~~~

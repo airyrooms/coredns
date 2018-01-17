@@ -9,3 +9,5 @@ debug.test
 kubectl
 go-test-tmpfile*
 coverage.txt
+conf/
+file.db

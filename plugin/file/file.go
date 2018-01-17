@@ -1,4 +1,5 @@
-// Package file implements a file backend.
+// Package file implements a file backend
+// Modified for Airy Engineering's double-deployment use case, using CNAME loadbalancing
 package file
 
 import (
@@ -16,8 +17,9 @@ import (
 type (
 	// File is the plugin that reads zone data from disk.
 	File struct {
-		Next  plugin.Handler
-		Zones Zones
+		Next    plugin.Handler
+		Zones   Zones
+		Weights Weights
 	}
 
 	// Zones maps zone names to a *Zone.
@@ -25,9 +27,15 @@ type (
 		Z     map[string]*Zone // A map mapping zone (origin) to the Zone's data
 		Names []string         // All the keys from the map Z as a string slice.
 	}
+
+	// Weights maps zone names to their respective weights
+	Weights struct {
+		W              map[string]*Weight
+		WeightedServer map[string]*WeightedServer
+	}
 )
 
-// ServeDNS implements the plugin.Handle interface.
+// ServeDNS implements the plugin.Handler interface.
 func (f File) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
 	state := request.Request{W: w, Req: r}
 
@@ -78,7 +86,7 @@ func (f File) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (i
 		return xfr.ServeDNS(ctx, w, r)
 	}
 
-	answer, ns, extra, result := z.Lookup(state, qname)
+	answer, ns, extra, result := z.Lookup(state, qname, &f.Weights)
 
 	m := new(dns.Msg)
 	m.SetReply(r)

@@ -3,7 +3,6 @@ package file
 import (
 	"github.com/coredns/coredns/plugin/file/tree"
 	"github.com/coredns/coredns/request"
-
 	"github.com/miekg/dns"
 )
 
@@ -25,7 +24,7 @@ const (
 
 // Lookup looks up qname and qtype in the zone. When do is true DNSSEC records are included.
 // Three sets of records are returned, one for the answer, one for authority  and one for the additional section.
-func (z *Zone) Lookup(state request.Request, qname string) ([]dns.RR, []dns.RR, []dns.RR, Result) {
+func (z *Zone) Lookup(state request.Request, qname string, wgt *Weights) ([]dns.RR, []dns.RR, []dns.RR, Result) {
 
 	qtype := state.QType()
 	do := state.Do()
@@ -103,10 +102,11 @@ func (z *Zone) Lookup(state request.Request, qname string) ([]dns.RR, []dns.RR, 
 
 		// If we see DNAME records, we should return those.
 		if dnamerrs := elem.Types(dns.TypeDNAME); dnamerrs != nil {
-			// Only one DNAME is allowed per name. We just pick the first one to synthesize from.
-			dname := dnamerrs[0]
+			// Only one DNAME is allowed per name. We will round-robin it.
+			dname := roundRobinShuffle(dnamerrs)
+
 			if cname := synthesizeCNAME(state.Name(), dname.(*dns.DNAME)); cname != nil {
-				answer, ns, extra, rcode := z.searchCNAME(state, elem, []dns.RR{cname})
+				answer, ns, extra, rcode := z.searchCNAME(state, elem, []dns.RR{cname}, wgt)
 
 				if do {
 					sigs := elem.Types(dns.TypeRRSIG)
@@ -157,7 +157,7 @@ func (z *Zone) Lookup(state request.Request, qname string) ([]dns.RR, []dns.RR, 
 	if found && shot {
 
 		if rrs := elem.Types(dns.TypeCNAME); len(rrs) > 0 && qtype != dns.TypeCNAME {
-			return z.searchCNAME(state, elem, rrs)
+			return z.searchCNAME(state, elem, rrs, wgt)
 		}
 
 		rrs := elem.Types(qtype, qname)
@@ -193,7 +193,7 @@ func (z *Zone) Lookup(state request.Request, qname string) ([]dns.RR, []dns.RR, 
 		auth := z.ns(do)
 
 		if rrs := wildElem.Types(dns.TypeCNAME, qname); len(rrs) > 0 {
-			return z.searchCNAME(state, wildElem, rrs)
+			return z.searchCNAME(state, wildElem, rrs, wgt)
 		}
 
 		rrs := wildElem.Types(qtype, qname)
@@ -296,7 +296,7 @@ func (z *Zone) ns(do bool) []dns.RR {
 }
 
 // TODO(miek): should be better named, like aditionalProcessing?
-func (z *Zone) searchCNAME(state request.Request, elem *tree.Elem, rrs []dns.RR) ([]dns.RR, []dns.RR, []dns.RR, Result) {
+func (z *Zone) searchCNAME(state request.Request, elem *tree.Elem, rrs []dns.RR, wgt *Weights) ([]dns.RR, []dns.RR, []dns.RR, Result) {
 
 	qtype := state.QType()
 	do := state.Do()
@@ -310,6 +310,18 @@ func (z *Zone) searchCNAME(state request.Request, elem *tree.Elem, rrs []dns.RR)
 	}
 
 	targetName := rrs[0].(*dns.CNAME).Target
+	if _, ok := wgt.WeightedServer[rrs[0].Header().Name]; ok {
+		//log.Println("Trying to shuffle records: ")
+		//weughted round-robin CNAME resolution in case of multiple CNAMEs
+		targetName = wgt.CnameWRRShuffle(rrs)
+		//targetName = rrs[0].(*dns.CNAME).Target
+	}
+
+	//for _, v := range rrs {
+	//	log.Println(v.String())
+	//}
+
+	//log.Println("The CNAME to search is: ", targetName)
 	elem, _ = z.Tree.Search(targetName)
 	if elem == nil {
 		if !dns.IsSubDomain(z.origin, targetName) {
