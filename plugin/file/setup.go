@@ -134,6 +134,7 @@ func fileWeightParse(c *caddy.Controller) (Zones, Weights, error) {
 				}
 
 				reader := csv.NewReader(bufio.NewReader(csvFile))
+				reader.Comment = ';'
 				for {
 					line, error := reader.Read()
 					if error == io.EOF {
