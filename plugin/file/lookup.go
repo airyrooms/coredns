@@ -319,12 +319,14 @@ func (z *Zone) searchCNAME(state request.Request, elem *tree.Elem, rrs []dns.RR,
 		//targetName = rrs[0].(*dns.CNAME).Target
 	}
 
-	for _, rr := range rrs {
-		if rr.Header().Rrtype == dns.TypeCNAME {
-			if isTarget, _ := regexp.MatchString(targetName, rr.String()); isTarget {
-				rrs = nil
-				rrs = append(rrs, rr)
-				break
+	if len(rrs) > 1 {
+		for _, rr := range rrs {
+			if rr.Header().Rrtype == dns.TypeCNAME {
+				if isTarget, _ := regexp.MatchString(targetName, rr.String()); isTarget {
+					rrs = nil
+					rrs = append(rrs, rr)
+					break
+				}
 			}
 		}
 	}
