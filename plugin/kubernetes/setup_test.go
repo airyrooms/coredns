@@ -64,7 +64,7 @@ func TestKubernetesParse(t *testing.T) {
 		},
 		{
 			`kubernetes coredns.local {
-	endpoint http://localhost:9090
+	endpoint http://localhost:9090 http://localhost:9091
 }`,
 			false,
 			"",
@@ -374,6 +374,20 @@ func TestKubernetesParse(t *testing.T) {
 }`,
 			true,
 			"not an IP address or file: \"13.14.15.16orange\"",
+			-1,
+			0,
+			defaultResyncPeriod,
+			"",
+			podModeDisabled,
+			fall.Zero,
+			nil,
+		},
+		// More than one Kubernetes not allowed
+		{
+			`kubernetes coredns.local
+kubernetes cluster.local`,
+			true,
+			"only one kubernetes section allowed per server block",
 			-1,
 			0,
 			defaultResyncPeriod,
