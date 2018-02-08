@@ -1,6 +1,8 @@
 package file
 
 import (
+	"regexp"
+
 	"github.com/coredns/coredns/plugin/file/tree"
 	"github.com/coredns/coredns/request"
 	"github.com/miekg/dns"
@@ -317,11 +319,16 @@ func (z *Zone) searchCNAME(state request.Request, elem *tree.Elem, rrs []dns.RR,
 		//targetName = rrs[0].(*dns.CNAME).Target
 	}
 
-	//for _, v := range rrs {
-	//	log.Println(v.String())
-	//}
+	for _, rr := range rrs {
+		if rr.Header().Rrtype == dns.TypeCNAME {
+			if isTarget, _ := regexp.MatchString(targetName, rr.String()); isTarget {
+				rrs = nil
+				rrs = append(rrs, rr)
+				break
+			}
+		}
+	}
 
-	//log.Println("The CNAME to search is: ", targetName)
 	elem, _ = z.Tree.Search(targetName)
 	if elem == nil {
 		if !dns.IsSubDomain(z.origin, targetName) {

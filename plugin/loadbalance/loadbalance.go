@@ -45,14 +45,8 @@ func roundRobin(in []dns.RR) []dns.RR {
 	roundRobinShuffle(address)
 	roundRobinShuffle(mx)
 
-	//return only the first CNAME, for CNAME loadbalancing
-	//roundRobinShuffle(cname)
-	if len(cname) != 0 {
-		cname = cname[:1]
-	}
-
 	out := append(cname, rest...)
-	out = append(address, rest...)
+	out = append(out, address...)
 	out = append(out, mx...)
 	return out
 }
